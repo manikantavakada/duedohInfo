@@ -1,0 +1,152 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-cream: #fffaf4;
+  --color-navy: #1b3a5c;
+  --color-orange: #c2410c;
+  --color-orange-soft: #fff1e8;
+  --font-display: "Baloo 2", "Inter", "Segoe UI", sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--color-cream);
+  color: #172433;
+  font-family: "Inter", "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer components {
+  .display {
+    font-family: var(--font-display);
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    line-height: 1.05;
+  }
+
+  .field {
+    width: 100%;
+    min-height: 50px;
+    padding: 12px 14px;
+    background: #fff;
+    border: 1px solid #cad4df;
+    border-radius: 14px;
+    outline: none;
+    transition: all 0.2s;
+    font-size: 15px;
+    color: #172433;
+  }
+  .field:focus {
+    border-color: #1b3a5c;
+    box-shadow: 0 0 0 3px #1b3a5c1f;
+  }
+  .field::placeholder {
+    color: #94a3b8;
+  }
+
+  .btn-primary {
+    display: inline-flex;
+    min-height: 50px;
+    color: #fff;
+    font-family: var(--font-display);
+    background: #c2410c;
+    border-radius: 14px;
+    justify-content: center;
+    align-items: center;
+    gap: 9px;
+    padding: 0 22px;
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: #a9370b;
+    transform: translateY(-1px);
+  }
+  .btn-primary:disabled {
+    cursor: not-allowed;
+    opacity: 0.42;
+    transform: none;
+  }
+
+  .btn-secondary {
+    display: inline-flex;
+    min-height: 48px;
+    font-family: var(--font-display);
+    color: #1b3a5c;
+    background: #fff;
+    border: 1px solid #cbd5df;
+    border-radius: 14px;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    padding: 0 18px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-secondary:hover:not(:disabled) {
+    border-color: #1b3a5c66;
+  }
+  .btn-secondary:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    color: #334e68;
+    background: #fff;
+    border: 1px solid #cbd5df;
+    border-radius: 999px;
+    min-height: 44px;
+    padding: 9px 14px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .chip:hover {
+    border-color: #1b3a5c55;
+  }
+  .chip.active {
+    color: #fff;
+    background: #1b3a5c;
+    border-color: #1b3a5c;
+    box-shadow: 0 5px 14px #1b3a5c2e;
+  }
+
+  .label {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: #334e68;
+    margin-bottom: 6px;
+  }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+}
+
+/* Subtle paper grid used behind the hero */
+.paper-grid {
+  background-image:
+    linear-gradient(rgba(200, 200, 200, 0.14) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(200, 200, 200, 0.14) 1px, transparent 1px);
+  background-size: 26px 26px;
+}

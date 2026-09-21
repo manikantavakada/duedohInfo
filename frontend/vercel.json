@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/v1/:path*", "destination": "https://duedoh-api.azurewebsites.net/v1/:path*" },
+    { "source": "/:path*", "destination": "/index.html" }
+  ]
+}
