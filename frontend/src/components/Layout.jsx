@@ -1,9 +1,7 @@
 import { Link } from "react-router-dom";
 
 function BrandMark({ compact = false }) {
-  return <span className={`grid shrink-0 place-items-center bg-navy ${compact ? "size-8 rounded-lg" : "size-9 rounded-xl"}`}>
-    <img src="/duedoh-mark.svg" alt="" className={compact ? "size-5" : "size-6"} />
-  </span>;
+  return <img src="/duedoh-logo.png" alt="" className={`shrink-0 ${compact ? "size-8 rounded-lg" : "size-9 rounded-xl"}`} />;
 }
 
 export function Header() {
