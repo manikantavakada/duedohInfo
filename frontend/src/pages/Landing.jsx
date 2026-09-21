@@ -4,7 +4,6 @@ import {
   BadgeIndianRupee,
   MapPin,
   ShieldCheck,
-  Sparkles,
 } from "lucide-react";
 import Layout from "../components/Layout.jsx";
 import { HOW_IT_WORKS, ELIGIBILITY, EARNINGS } from "../data.js";
@@ -18,7 +17,7 @@ export default function Landing() {
         <div className="relative mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-[1.15fr_.85fr]">
           <div>
             <span className="inline-flex items-center gap-2 rounded-full bg-orange-soft px-3 py-1 text-xs font-black uppercase tracking-widest text-orange">
-              <Sparkles size={14} /> Hyderabad · Visakhapatnam
+              <MapPin size={14} /> Hyderabad · Visakhapatnam
             </span>
             <h1 className="display mt-5 text-4xl text-navy sm:text-6xl">
               Every city has a Dude.{" "}
