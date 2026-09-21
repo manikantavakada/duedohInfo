@@ -1,18 +1,17 @@
 import { Link } from "react-router-dom";
-import { Sparkles } from "lucide-react";
 
 function BrandMark({ compact = false }) {
-  return <span className={`grid shrink-0 place-items-center bg-navy text-white ${compact ? "size-9 rounded-xl" : "size-12 rounded-[18px]"}`}>
-    <Sparkles size={compact ? 18 : 26} strokeWidth={2.4} aria-hidden="true" />
+  return <span className={`grid shrink-0 place-items-center bg-navy ${compact ? "size-8 rounded-lg" : "size-9 rounded-xl"}`}>
+    <img src="/duedoh-mark.svg" alt="" className={compact ? "size-5" : "size-6"} />
   </span>;
 }
 
 export function Header() {
   return <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
-    <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3 sm:py-4">
-      <Link to="/" className="flex items-center gap-3" aria-label="Duedoh home">
+    <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3">
+      <Link to="/" className="flex items-center gap-2" aria-label="Duedoh home">
         <BrandMark />
-        <span className="display text-2xl text-navy sm:text-3xl">Duedoh</span>
+        <span className="display text-xl text-navy">Duedoh</span>
       </Link>
       <nav className="flex items-center gap-2 sm:gap-3">
         <Link to="/status" className="btn-secondary px-3 text-sm sm:px-4">My application</Link>
