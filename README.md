@@ -18,7 +18,7 @@ npm install
 npm run dev
 ```
 
-The Vite proxy sends `/v1` requests to `https://duedoh-api.azurewebsites.net`.
+The Vite proxy sends `/v1` requests to `https://api.duedoh.com`.
 
 ## Vercel
 

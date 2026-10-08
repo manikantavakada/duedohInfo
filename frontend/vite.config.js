@@ -10,7 +10,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       "/v1": {
-        target: "https://duedoh-api.azurewebsites.net",
+        target: "https://api.duedoh.com",
         changeOrigin: true,
       },
     },
