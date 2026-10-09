@@ -1,4 +1,4 @@
-export function Field({ label, hint, children, optional }) {
+export function Field({ label, hint, error, children, optional }) {
   return (
     <label className="block">
       <span className="label">
@@ -6,7 +6,9 @@ export function Field({ label, hint, children, optional }) {
         {optional && <span className="ml-1 font-normal text-slate-400">(optional)</span>}
       </span>
       {children}
-      {hint && <span className="mt-1 block text-xs text-slate-400">{hint}</span>}
+      {error
+        ? <span className="mt-1 block text-xs font-semibold text-red-600">{error}</span>
+        : hint && <span className="mt-1 block text-xs text-slate-400">{hint}</span>}
     </label>
   );
 }

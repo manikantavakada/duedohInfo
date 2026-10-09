@@ -8,9 +8,10 @@ import { api } from "../api.js";
 const STORAGE_KEY = "duedoh-info-registration";
 const languages = ["English", "Hindi", "Telugu", "Tamil", "Kannada", "Urdu"];
 const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const vehiclePhotoTypes = ["vehicle_front", "vehicle_side", "vehicle_rear", "vehicle_interior"];
 const initialForm = {
   fullName: "", email: "", otp: "", phone: "", dob: "", cityId: "", qualification: "", bio: "", languages: [], experienceYears: "",
-  tier: "lite", vehicleType: "bike", brand: "", model: "", vehicleNumber: "", seatCount: "", licenceExpiry: "", rcExpiry: "", insuranceExpiry: "", insuranceNumber: "",
+  tier: "lite", vehicleType: "bike", brand: "", model: "", vehicleNumber: "", seatCount: "", licenceExpiry: "", rcExpiry: "",
   weeklyDays: [0, 1, 2, 3, 4], start: "09:00", end: "18:00", instantConnect: true,
   idType: "pan", panNumber: "", aadhaarNumber: "", payoutType: "upi", upiId: "", bankAccountNo: "", bankIfsc: "", bankHolderName: "",
 };
@@ -84,8 +85,18 @@ export default function Apply() {
     }
     if (currentLabel === "Service" && !form.tier) return "Choose a service tier.";
     if (currentLabel === "Vehicle") {
-      const vehiclePhotos = [files.vehicle_front, files.vehicle_side, files.vehicle_rear, files.vehicle_interior];
-      if (![form.brand, form.model, form.vehicleNumber, form.seatCount, form.licenceExpiry, form.rcExpiry].every((value) => String(value).trim()) || vehiclePhotos.some((file) => !file)) return "Complete every vehicle detail and add front, side, rear, and interior photos.";
+      const errors = {};
+      if (!form.brand.trim()) errors.brand = "Enter the vehicle brand.";
+      if (!form.model.trim()) errors.model = "Enter the vehicle model.";
+      if (!form.vehicleNumber.trim()) errors.vehicle_number = "Enter the registration number.";
+      const seatCount = Number(form.seatCount);
+      const seatLimits = form.vehicleType === "bike" ? [2, 2] : form.vehicleType === "auto" ? [3, 5] : [4, 8];
+      if (!form.seatCount || !Number.isInteger(seatCount) || seatCount < seatLimits[0] || seatCount > seatLimits[1]) errors.seat_count = `Enter ${seatLimits[0]}${seatLimits[0] === seatLimits[1] ? "" : `–${seatLimits[1]}`} seats including the driver.`;
+      if (!form.licenceExpiry) errors.licence_expiry = "Select the driving licence expiry date.";
+      if (!form.rcExpiry) errors.rc_expiry = "Select the RC expiry date.";
+      if (vehiclePhotoTypes.filter((type) => files[type]).length < 2) errors.vehicle_photos = "Add at least two clear vehicle photos.";
+      setFieldErrors(errors);
+      if (Object.keys(errors).length) return "Please correct the highlighted vehicle fields.";
     }
     if (currentLabel === "Availability") {
       if (!form.weeklyDays.length || !form.start || !form.end || form.start >= form.end) return "Choose at least one day and a valid time range.";
@@ -127,7 +138,7 @@ export default function Apply() {
       } else if (currentLabel === "Vehicle") {
         await api.saveVehicle({ vehicle_type: form.vehicleType, brand: form.brand, model: form.model, vehicle_number: form.vehicleNumber, seat_count: Number(form.seatCount), licence_expiry: form.licenceExpiry, rc_expiry: form.rcExpiry });
         const vehiclePhotos = new FormData();
-        ["vehicle_front", "vehicle_side", "vehicle_rear", "vehicle_interior"].forEach((type) => vehiclePhotos.append(type, files[type]));
+        vehiclePhotoTypes.forEach((type) => { if (files[type]) vehiclePhotos.append(type, files[type]); });
         await api.uploadDocuments(vehiclePhotos);
       } else if (currentLabel === "Availability") {
         await api.saveAvailability({ weekly: form.weeklyDays.map((day) => ({ day_of_week: day, start: form.start, end: form.end })), instant_connect: form.instantConnect });
@@ -170,7 +181,21 @@ export default function Apply() {
 
         {currentLabel === "Service" && <div className="space-y-4">{tierOptions.length ? tierOptions.map((tier) => <div key={tier.code} role="button" tabIndex={0} onClick={() => set("tier", tier.code)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") set("tier", tier.code); }} className={`w-full cursor-pointer border p-5 text-left transition ${form.tier === tier.code ? "border-orange bg-orange-soft" : "border-slate-200 hover:border-slate-400"}`}><div><p className="text-lg font-black text-navy">{tier.title}</p><p className="mt-1 text-sm text-slate-600">{tier.description}</p></div>{tier.code === "pro" && form.tier === "pro" && <div className="mt-5 border-t border-orange/20 pt-4"><span className="label">Your vehicle type</span><div className="flex flex-wrap gap-2">{(tier.vehicles || [{ code: "bike", title: "Bike" }, { code: "auto", title: "Auto" }, { code: "car", title: "Car" }]).map((vehicle) => <Toggle key={vehicle.code} active={form.vehicleType === vehicle.code} onClick={() => set("vehicleType", vehicle.code)}>{vehicle.title}</Toggle>)}</div></div>}</div>) : <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-600">Loading the current Duedoh service options...</p>}</div>}
 
-        {currentLabel === "Vehicle" && <div className="grid gap-5 sm:grid-cols-2"><div className="sm:col-span-2 rounded-xl bg-orange-soft p-4 text-sm text-slate-700">A complete vehicle record and clear photos from every angle are required for Pro applications.</div><Field label="Vehicle brand"><input className="field" value={form.brand} onChange={(e) => set("brand", e.target.value)} placeholder="e.g. Honda" /></Field><Field label="Vehicle model"><input className="field" value={form.model} onChange={(e) => set("model", e.target.value)} placeholder="e.g. Activa" /></Field><Field label="Vehicle registration number"><input className={`field ${fieldErrors.vehicle_number ? "border-red-500" : ""}`} value={form.vehicleNumber} onChange={(e) => set("vehicleNumber", e.target.value.toUpperCase())} placeholder="TS09AB1234" /></Field><Field label="Seats including driver"><input className="field" type="number" min={form.vehicleType === "bike" ? 2 : 3} max={form.vehicleType === "bike" ? 2 : 8} value={form.seatCount} onChange={(e) => set("seatCount", e.target.value)} placeholder={form.vehicleType === "bike" ? "2" : "5"} /></Field><Field label="Driving licence expiry"><input className="field" type="date" value={form.licenceExpiry} onChange={(e) => set("licenceExpiry", e.target.value)} /></Field><Field label="RC expiry"><input className="field" type="date" value={form.rcExpiry} onChange={(e) => set("rcExpiry", e.target.value)} /></Field><div className="sm:col-span-2 border-t border-slate-200 pt-6"><p className="text-sm font-bold text-navy">Vehicle photos</p><p className="mt-1 text-sm text-slate-500">Add a clear front, side, rear, and interior photo, just as required in the Dude app.</p><div className="mt-4 grid gap-4 sm:grid-cols-2">{[["vehicle_front", "Front view"], ["vehicle_side", "Side view"], ["vehicle_rear", "Rear view"], ["vehicle_interior", "Interior view"]].map(([type, label]) => <FileField key={type} label={label} value={files[type]} accept="image/*" hint="A clear photo of your vehicle" onChange={(file) => setFiles((current) => ({ ...current, [type]: file }))} />)}</div></div></div>}
+        {currentLabel === "Vehicle" && <div className="grid gap-5 sm:grid-cols-2">
+          <div className="sm:col-span-2 rounded-xl bg-orange-soft p-4 text-sm text-slate-700">Complete the vehicle record and add any two clear vehicle photos. Additional angles are optional.</div>
+          <Field label="Vehicle brand" error={fieldErrors.brand}><input className={`field ${fieldErrors.brand ? "border-red-500" : ""}`} value={form.brand} onChange={(e) => set("brand", e.target.value)} placeholder="e.g. Honda" /></Field>
+          <Field label="Vehicle model" error={fieldErrors.model}><input className={`field ${fieldErrors.model ? "border-red-500" : ""}`} value={form.model} onChange={(e) => set("model", e.target.value)} placeholder="e.g. Activa" /></Field>
+          <Field label="Vehicle registration number" error={fieldErrors.vehicle_number}><input className={`field ${fieldErrors.vehicle_number ? "border-red-500" : ""}`} value={form.vehicleNumber} onChange={(e) => set("vehicleNumber", e.target.value.toUpperCase())} placeholder="TS09AB1234" /></Field>
+          <Field label="Seats including driver" error={fieldErrors.seat_count}><input className={`field ${fieldErrors.seat_count ? "border-red-500" : ""}`} type="number" min={form.vehicleType === "bike" ? 2 : form.vehicleType === "auto" ? 3 : 4} max={form.vehicleType === "bike" ? 2 : form.vehicleType === "auto" ? 5 : 8} value={form.seatCount} onChange={(e) => set("seatCount", e.target.value)} placeholder={form.vehicleType === "bike" ? "2" : "5"} /></Field>
+          <Field label="Driving licence expiry" error={fieldErrors.licence_expiry}><input className={`field ${fieldErrors.licence_expiry ? "border-red-500" : ""}`} type="date" value={form.licenceExpiry} onChange={(e) => set("licenceExpiry", e.target.value)} /></Field>
+          <Field label="RC expiry" error={fieldErrors.rc_expiry}><input className={`field ${fieldErrors.rc_expiry ? "border-red-500" : ""}`} type="date" value={form.rcExpiry} onChange={(e) => set("rcExpiry", e.target.value)} /></Field>
+          <div className="sm:col-span-2 border-t border-slate-200 pt-6">
+            <p className="text-sm font-bold text-navy">Vehicle photos <span className="font-normal text-slate-400">(minimum 2)</span></p>
+            <p className="mt-1 text-sm text-slate-500">Choose any two or more clear angles. Front, side, rear, and interior are all accepted.</p>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">{[["vehicle_front", "Front view"], ["vehicle_side", "Side view"], ["vehicle_rear", "Rear view"], ["vehicle_interior", "Interior view"]].map(([type, label]) => <FileField key={type} label={label} value={files[type]} accept="image/*" hint="A clear photo of your vehicle" onChange={(file) => setFiles((current) => ({ ...current, [type]: file }))} />)}</div>
+            {fieldErrors.vehicle_photos && <p className="mt-2 text-xs font-semibold text-red-600">{fieldErrors.vehicle_photos}</p>}
+          </div>
+        </div>}
 
         {currentLabel === "Availability" && <div className="space-y-6"><Field label="Days you are usually available"><div className="flex flex-wrap gap-2">{days.map((day, index) => <Toggle key={day} active={form.weeklyDays.includes(index)} onClick={() => set("weeklyDays", form.weeklyDays.includes(index) ? form.weeklyDays.filter((item) => item !== index) : [...form.weeklyDays, index].sort())}>{day.slice(0, 3)}</Toggle>)}</div></Field><div className="grid gap-5 sm:grid-cols-2"><Field label="Start time"><input className="field" type="time" value={form.start} onChange={(e) => set("start", e.target.value)} /></Field><Field label="End time"><input className="field" type="time" value={form.end} onChange={(e) => set("end", e.target.value)} /></Field></div><button type="button" onClick={() => set("instantConnect", !form.instantConnect)} className={`flex w-full items-center justify-between border p-4 text-left ${form.instantConnect ? "border-orange bg-orange-soft" : "border-slate-200"}`}><span><span className="block font-bold text-navy">Instant Connect availability</span><span className="mt-1 block text-sm text-slate-600">Allow eligible travellers to find you for instant chat support.</span></span><span className={`relative h-7 w-12 rounded-full ${form.instantConnect ? "bg-orange" : "bg-slate-300"}`}><span className={`absolute top-1 size-5 rounded-full bg-white transition ${form.instantConnect ? "left-6" : "left-1"}`} /></span></button></div>}
 
