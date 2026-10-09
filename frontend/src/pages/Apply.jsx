@@ -40,7 +40,8 @@ function Toggle({ active, onClick, children }) {
 export default function Apply() {
   const navigate = useNavigate();
   const [form, setForm] = useState(persistedForm);
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(() => api.hasSession(form.email) ? 1 : 0);
+  const [authenticated, setAuthenticated] = useState(() => api.hasSession(form.email));
   const [otpRequested, setOtpRequested] = useState(false);
   const [cities, setCities] = useState([]);
   const [tierOptions, setTierOptions] = useState([]);
@@ -54,6 +55,14 @@ export default function Apply() {
   const steps = useMemo(() => ["Account", "Personal", "Service", ...(needsVehicle ? ["Vehicle"] : []), "Availability", "Documents", "Payout"], [needsVehicle]);
   const currentLabel = steps[step];
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  const setEmail = (value) => {
+    const normalized = value.trim().toLowerCase();
+    const verifiedEmail = api.sessionEmail() || form.email.trim().toLowerCase();
+    set("email", value);
+    if (authenticated && normalized !== verifiedEmail) setAuthenticated(false);
+    setOtpRequested(false);
+    set("otp", "");
+  };
 
   useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(form)); }, [form]);
   useEffect(() => { window.scrollTo({ top: 0, behavior: "smooth" }); }, [step]);
@@ -77,6 +86,7 @@ export default function Apply() {
     if (currentLabel === "Account") {
       if (!form.fullName.trim()) return "Enter your full name.";
       if (!/^[^@\s]+@[^@\s]+\.[a-zA-Z]{2,}$/.test(form.email.trim())) return "Enter a valid email address.";
+      if (authenticated && api.hasSession(form.email)) return "";
       if (!otpRequested) return "Request your verification code to continue.";
       if (!/^\d{6}$/.test(form.otp.trim())) return "Enter the 6-digit verification code.";
     }
@@ -129,7 +139,10 @@ export default function Apply() {
     setLoading(true); setError(""); setFieldErrors({});
     try {
       if (currentLabel === "Account") {
-        await api.verifyOtp({ email: form.email, otp: form.otp, fullName: form.fullName });
+        if (!authenticated || !api.hasSession(form.email)) {
+          await api.verifyOtp({ email: form.email, otp: form.otp, fullName: form.fullName });
+          setAuthenticated(true);
+        }
         await loadLookups();
       } else if (currentLabel === "Personal") {
         await api.saveProfile({ full_name: form.fullName.trim(), email: form.email.trim(), phone: form.phone, date_of_birth: form.dob, city_id: form.cityId, qualification: form.qualification.trim(), bio: form.bio.trim(), languages: form.languages });
@@ -160,6 +173,11 @@ export default function Apply() {
       }
       setStep((value) => value + 1);
     } catch (requestError) {
+      if (requestError.status === 401) {
+        setAuthenticated(false);
+        setOtpRequested(false);
+        setStep(0);
+      }
       setError(requestError.message || "Unable to save this step.");
       setFieldErrors(requestError.fields || {});
     } finally { setLoading(false); }
@@ -175,7 +193,7 @@ export default function Apply() {
       <div className="mb-8 grid grid-cols-4 gap-1 sm:grid-cols-7">{steps.map((item, index) => <div key={item}><div className={`h-1.5 rounded-full ${index <= step ? "bg-orange" : "bg-slate-200"}`} /><span className={`mt-2 hidden text-[11px] font-semibold sm:block ${index === step ? "text-navy" : "text-slate-400"}`}>{item}</span></div>)}</div>
 
       <section className="border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
-        {currentLabel === "Account" && <div className="space-y-5"><div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-600"><ShieldCheck className="mr-2 inline text-orange" size={18} />Use the email you will use to sign in to the Dude app after launch.</div><Field label="Full name"><input className="field" value={form.fullName} onChange={(e) => set("fullName", e.target.value)} placeholder="Your full name" /></Field><Field label="Email address"><input className="field" type="email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="you@example.com" /></Field>{otpRequested && <Field label="Verification code" hint="We sent a 6-digit code to your email."><input className="field tracking-[.25em]" inputMode="numeric" maxLength="6" value={form.otp} onChange={(e) => set("otp", e.target.value.replace(/\D/g, ""))} placeholder="000000" /></Field>}<button type="button" className="btn-secondary w-full" onClick={requestOtp} disabled={loading}>{loading && !otpRequested ? <Loader2 className="animate-spin" size={18} /> : otpRequested ? "Send a new code" : "Send verification code"}</button></div>}
+        {currentLabel === "Account" && <div className="space-y-5"><div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-600"><ShieldCheck className="mr-2 inline text-orange" size={18} />Use the email you will use to sign in to the Dude app after launch.</div><Field label="Full name"><input className="field" value={form.fullName} onChange={(e) => set("fullName", e.target.value)} placeholder="Your full name" /></Field><Field label="Email address"><input className="field" type="email" value={form.email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" /></Field>{authenticated && api.hasSession(form.email) ? <p className="rounded-xl border border-green-200 bg-green-50 p-3 text-sm font-semibold text-green-800">Email verified. Your secure session will continue automatically.</p> : <>{otpRequested && <Field label="Verification code" hint="We sent a 6-digit code to your email."><input className="field tracking-[.25em]" inputMode="numeric" maxLength="6" value={form.otp} onChange={(e) => set("otp", e.target.value.replace(/\D/g, ""))} placeholder="000000" /></Field>}<button type="button" className="btn-secondary w-full" onClick={requestOtp} disabled={loading}>{loading && !otpRequested ? <Loader2 className="animate-spin" size={18} /> : otpRequested ? "Send a new code" : "Send verification code"}</button></>}</div>}
 
         {currentLabel === "Personal" && <div className="grid gap-5 sm:grid-cols-2"><Field label="Mobile number" hint="10 digits, without +91"><input className="field" inputMode="tel" maxLength="10" value={form.phone} onChange={(e) => set("phone", e.target.value.replace(/\D/g, ""))} placeholder="9876543210" /></Field><Field label="Date of birth"><input className="field" type="date" value={form.dob} onChange={(e) => set("dob", e.target.value)} /></Field><Field label="Home city"><select className="field" value={form.cityId} disabled={loadingLookups} onChange={(e) => set("cityId", e.target.value)}><option value="">Select a Duedoh city</option>{cities.map((city) => <option key={city.id} value={city.id}>{city.name}{city.state ? `, ${city.state}` : ""}</option>)}</select></Field><Field label="Qualification"><input className="field" value={form.qualification} onChange={(e) => set("qualification", e.target.value)} placeholder="e.g. Graduate" /></Field><div className="sm:col-span-2"><Field label="Languages you speak"><div className="flex flex-wrap gap-2">{languages.map((language) => <Toggle key={language} active={form.languages.includes(language)} onClick={() => set("languages", form.languages.includes(language) ? form.languages.filter((item) => item !== language) : [...form.languages, language])}>{language}</Toggle>)}</div></Field></div><div className="sm:col-span-2"><Field label="What can you show in your city?"><textarea className="field min-h-28" maxLength="300" value={form.bio} onChange={(e) => set("bio", e.target.value)} placeholder="Share the places, experiences, and local highlights you can show travellers." /></Field></div></div>}
 
