@@ -81,7 +81,7 @@ export const HOW_IT_WORKS = [
   ["Apply", "takes 5 minutes on your phone"],
   ["Get verified", "ID check and a short conversation with our team"],
   ["Pick your hours", "you choose the days you're free"],
-  ["Start earning", "meet travellers and make their day work"],
+  ["Start earning", "meet travellers or answer Duedoh Ask requests from home"],
 ];
 
 export const ELIGIBILITY = [

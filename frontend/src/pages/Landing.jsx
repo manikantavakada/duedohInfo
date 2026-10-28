@@ -3,7 +3,10 @@ import {
   ArrowRight,
   BadgeIndianRupee,
   MapPin,
+  MessageCircle,
   ShieldCheck,
+  Smartphone,
+  Wifi,
 } from "lucide-react";
 import Layout from "../components/Layout.jsx";
 import { HOW_IT_WORKS, ELIGIBILITY, EARNINGS } from "../data.js";
@@ -16,17 +19,21 @@ export default function Landing() {
         <div className="absolute -right-24 top-4 size-72 rounded-full bg-orange/10 blur-3xl" />
         <div className="relative mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-[1.15fr_.85fr]">
           <div>
-            <span className="inline-flex items-center gap-2 rounded-full bg-orange-soft px-3 py-1 text-xs font-black uppercase tracking-widest text-orange">
-              <MapPin size={14} /> Hyderabad · Visakhapatnam
-            </span>
+            <div className="flex flex-wrap gap-2">
+              <span className="inline-flex items-center gap-2 rounded-full bg-orange-soft px-3 py-1 text-xs font-black uppercase tracking-widest text-orange">
+                <MapPin size={14} /> Hyderabad · Visakhapatnam
+              </span>
+              <span className="inline-flex items-center gap-2 rounded-full bg-navy px-3 py-1 text-xs font-black uppercase tracking-widest text-white">
+                <Smartphone size={14} /> Coming soon to Google Play
+              </span>
+            </div>
             <h1 className="display mt-5 text-4xl text-navy sm:text-6xl">
               Every city has a Dude.{" "}
               <span className="text-orange">Be the one.</span>
             </h1>
             <p className="mt-5 max-w-xl text-lg text-slate-600">
-              Earn money by knowing your city. Host travellers visiting Hyderabad and
-              Vizag — show them around, help with language and prices, make their day
-              work.
+              Earn money by knowing your city. Help travellers on the ground, or go
+              online from home and answer their questions through Duedoh Ask.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link to="/apply" className="btn-primary w-full sm:w-auto">
@@ -62,7 +69,8 @@ export default function Landing() {
             </div>
             <p className="mt-4 text-xs text-slate-400">
               Earnings depend on how many days you work and whether you have a vehicle.
-              Fuel is reimbursed separately.
+              Fuel is reimbursed separately. Duedoh Ask earnings depend on eligible
+              completed support time.
             </p>
           </div>
         </div>
@@ -89,6 +97,42 @@ export default function Landing() {
               <p className="mt-1 text-sm text-slate-500">{body}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Duedoh Ask */}
+      <section className="mx-auto max-w-6xl px-5 py-12">
+        <div className="overflow-hidden rounded-3xl bg-orange-soft p-6 sm:p-10">
+          <div className="grid gap-8 lg:grid-cols-[.85fr_1.15fr] lg:items-center">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[.2em] text-orange">
+                Duedoh Ask · Instant Connect
+              </p>
+              <h2 className="display mt-3 text-3xl text-navy sm:text-4xl">
+                Earn from home with your local knowledge.
+              </h2>
+              <p className="mt-4 max-w-xl text-slate-600">
+                Travelers need quick answers about directions, local prices, food,
+                language, and what to do next. Duedoh Ask connects them with an online
+                Dude for paid remote help by chat or call—no travel required.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {[
+                [Wifi, "Go online", "Choose when you are ready to receive Duedoh Ask requests."],
+                [MessageCircle, "Help remotely", "Reply from home by chat or call with useful local guidance."],
+                [BadgeIndianRupee, "Earn for support", "Get paid for eligible completed support time under Duedoh policy."],
+              ].map(([Icon, title, body]) => (
+                <div key={title} className="rounded-2xl bg-white p-5 shadow-sm shadow-navy/5">
+                  <span className="grid size-10 place-items-center rounded-xl bg-orange text-white">
+                    <Icon size={20} />
+                  </span>
+                  <p className="display mt-4 text-lg text-navy">{title}</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-500">{body}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
@@ -140,7 +184,7 @@ export default function Landing() {
           <h2 className="display mt-3 text-3xl sm:text-4xl">Up to ₹10,000</h2>
           <p className="mt-3 max-w-lg text-white/80">
             Your city is already a skill. Join as a founding Dude and turn the places you
-            know into flexible earnings.
+            know into flexible earnings—on the ground or remotely from home with Duedoh Ask.
           </p>
           <Link to="/apply" className="btn-primary mt-8 w-full sm:w-auto">
             Start earning <ArrowRight size={18} />
