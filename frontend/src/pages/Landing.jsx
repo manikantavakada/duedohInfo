@@ -137,7 +137,7 @@ export default function Landing() {
           <p className="text-xs font-black uppercase tracking-[.2em] text-orange-200">
             For our first verified Dudes.
           </p>
-          <h2 className="display mt-3 text-3xl sm:text-4xl">Up to ₹25,000</h2>
+          <h2 className="display mt-3 text-3xl sm:text-4xl">Up to ₹10,000</h2>
           <p className="mt-3 max-w-lg text-white/80">
             Your city is already a skill. Join as a founding Dude and turn the places you
             know into flexible earnings.
