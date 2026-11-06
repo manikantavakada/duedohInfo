@@ -12,12 +12,16 @@ const vehiclePhotoTypes = ["vehicle_front", "vehicle_side", "vehicle_rear", "veh
 const initialForm = {
   fullName: "", email: "", otp: "", phone: "", dob: "", cityId: "", qualification: "", bio: "", languages: [], experienceYears: "",
   tier: "lite", vehicleType: "bike", brand: "", model: "", vehicleNumber: "", seatCount: "", licenceExpiry: "", rcExpiry: "",
-  weeklyDays: [0, 1, 2, 3, 4], start: "09:00", end: "18:00", instantConnect: true,
+  weeklyDays: [0, 1, 2, 3, 4],
   idType: "pan", panNumber: "", aadhaarNumber: "", payoutType: "upi", upiId: "", bankAccountNo: "", bankIfsc: "", bankHolderName: "",
 };
 
 function persistedForm() {
-  try { return { ...initialForm, ...JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}") }; }
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+    // Drop retired time slots from applications saved by the old website.
+    return Object.fromEntries(Object.entries(initialForm).map(([key, value]) => [key, saved?.[key] ?? value]));
+  }
   catch { return initialForm; }
 }
 
@@ -109,7 +113,7 @@ export default function Apply() {
       if (Object.keys(errors).length) return "Please correct the highlighted vehicle fields.";
     }
     if (currentLabel === "Availability") {
-      if (!form.weeklyDays.length || !form.start || !form.end || form.start >= form.end) return "Choose at least one day and a valid time range.";
+      if (!form.weeklyDays.length) return "Choose at least one available day.";
     }
     if (currentLabel === "Documents") {
       const identityFiles = form.idType === "pan" ? [files.pan_front, files.pan_back] : [files.aadhaar_front, files.aadhaar_back];
@@ -154,7 +158,7 @@ export default function Apply() {
         vehiclePhotoTypes.forEach((type) => { if (files[type]) vehiclePhotos.append(type, files[type]); });
         await api.uploadDocuments(vehiclePhotos);
       } else if (currentLabel === "Availability") {
-        await api.saveAvailability({ weekly: form.weeklyDays.map((day) => ({ day_of_week: day, start: form.start, end: form.end })), instant_connect: form.instantConnect });
+        await api.saveAvailability({ weekly: form.weeklyDays.map((day) => ({ day_of_week: day })) });
       } else if (currentLabel === "Documents") {
         const body = new FormData();
         body.append(form.idType === "pan" ? "pan_number" : "aadhaar_number", form.idType === "pan" ? form.panNumber.toUpperCase() : form.aadhaarNumber);
@@ -215,7 +219,16 @@ export default function Apply() {
           </div>
         </div>}
 
-        {currentLabel === "Availability" && <div className="space-y-6"><Field label="Days you are usually available"><div className="flex flex-wrap gap-2">{days.map((day, index) => <Toggle key={day} active={form.weeklyDays.includes(index)} onClick={() => set("weeklyDays", form.weeklyDays.includes(index) ? form.weeklyDays.filter((item) => item !== index) : [...form.weeklyDays, index].sort())}>{day.slice(0, 3)}</Toggle>)}</div></Field><div className="grid gap-5 sm:grid-cols-2"><Field label="Start time"><input className="field" type="time" value={form.start} onChange={(e) => set("start", e.target.value)} /></Field><Field label="End time"><input className="field" type="time" value={form.end} onChange={(e) => set("end", e.target.value)} /></Field></div><button type="button" onClick={() => set("instantConnect", !form.instantConnect)} className={`flex w-full items-center justify-between border p-4 text-left ${form.instantConnect ? "border-orange bg-orange-soft" : "border-slate-200"}`}><span><span className="block font-bold text-navy">Instant Connect availability</span><span className="mt-1 block text-sm text-slate-600">Allow eligible travellers to find you for instant chat support.</span></span><span className={`relative h-7 w-12 rounded-full ${form.instantConnect ? "bg-orange" : "bg-slate-300"}`}><span className={`absolute top-1 size-5 rounded-full bg-white transition ${form.instantConnect ? "left-6" : "left-1"}`} /></span></button></div>}
+        {currentLabel === "Availability" && <div className="space-y-6">
+          <fieldset>
+            <legend className="label">Days you are usually available</legend>
+            <div className="flex flex-wrap gap-2">{days.map((day, index) => <Toggle key={day} active={form.weeklyDays.includes(index)} onClick={() => set("weeklyDays", form.weeklyDays.includes(index) ? form.weeklyDays.filter((item) => item !== index) : [...form.weeklyDays, index].sort())}>{day.slice(0, 3)}</Toggle>)}</div>
+            <p className="mt-2 text-xs text-slate-500">Select your available days. There are no fixed start or end time slots.</p>
+          </fieldset>
+          <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
+            Travellers choose their trip times when booking on your available dates. After approval, you can manage specific available dates and go online for eligible chat sessions in the Dude app.
+          </div>
+        </div>}
 
         {currentLabel === "Documents" && <div className="space-y-6"><div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-600"><Clock3 className="mr-2 inline text-orange" size={18} />These documents are reviewed by the Duedoh team before your account is approved.</div><Field label="Choose identity document"><div className="flex gap-2"><Toggle active={form.idType === "pan"} onClick={() => set("idType", "pan")}>PAN card</Toggle><Toggle active={form.idType === "aadhaar"} onClick={() => set("idType", "aadhaar")}>Aadhaar card</Toggle></div></Field><Field label={form.idType === "pan" ? "PAN number" : "Aadhaar number"}><input className="field" maxLength={form.idType === "pan" ? 10 : 12} value={form.idType === "pan" ? form.panNumber : form.aadhaarNumber} onChange={(e) => set(form.idType === "pan" ? "panNumber" : "aadhaarNumber", form.idType === "pan" ? e.target.value.toUpperCase() : e.target.value.replace(/\D/g, ""))} placeholder={form.idType === "pan" ? "AAAAA9999A" : "12-digit Aadhaar number"} /></Field><div className="grid gap-4 sm:grid-cols-2"><FileField label={`${form.idType === "pan" ? "PAN" : "Aadhaar"} front`} value={files[`${form.idType}_front`]} onChange={(file) => setFiles((current) => ({ ...current, [`${form.idType}_front`]: file }))} /><FileField label={`${form.idType === "pan" ? "PAN" : "Aadhaar"} back`} value={files[`${form.idType}_back`]} onChange={(file) => setFiles((current) => ({ ...current, [`${form.idType}_back`]: file }))} /><FileField label="Your selfie" value={files.selfie} onChange={(file) => setFiles((current) => ({ ...current, selfie: file }))} hint="A clear, recent face photo" /></div>{needsVehicle && <><p className="border-t border-slate-200 pt-6 text-sm font-bold text-navy">Vehicle documents</p><div className="grid gap-4 sm:grid-cols-2"><FileField label="Driving licence front" value={files.licence_front} onChange={(file) => setFiles((current) => ({ ...current, licence_front: file }))} /><FileField label="Driving licence back" value={files.licence_back} onChange={(file) => setFiles((current) => ({ ...current, licence_back: file }))} /><FileField label="RC document" value={files.rc} onChange={(file) => setFiles((current) => ({ ...current, rc: file }))} /></div></>}</div>}
 
