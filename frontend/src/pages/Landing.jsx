@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
 import {
   ArrowRight,
   BadgeIndianRupee,
@@ -12,6 +13,26 @@ import Layout from "../components/Layout.jsx";
 import { HOW_IT_WORKS, ELIGIBILITY, EARNINGS } from "../data.js";
 
 export default function Landing() {
+  const [countdown, setCountdown] = useState("");
+  const [launchVideo, setLaunchVideo] = useState("");
+  useEffect(() => {
+    const launchAt = Date.parse("2026-11-29T00:00:00+05:30");
+    const update = () => {
+      const remaining = Math.max(0, launchAt - Date.now());
+      if (!remaining) { setCountdown("Launch day is here!"); return; }
+      const days = Math.floor(remaining / 86400000);
+      const hours = Math.floor((remaining % 86400000) / 3600000);
+      const minutes = Math.floor((remaining % 3600000) / 60000);
+      setCountdown(`${days} days · ${hours} hours · ${minutes} minutes`);
+    };
+    update();
+    const timer = window.setInterval(update, 60000);
+    fetch("https://api.duedoh.com/v1/home/launch")
+      .then((response) => response.ok ? response.json() : null)
+      .then((details) => { if (details?.video_url) setLaunchVideo(new URL(details.video_url, "https://api.duedoh.com").href); })
+      .catch(() => {});
+    return () => window.clearInterval(timer);
+  }, []);
   return (
     <Layout>
       {/* Hero */}
@@ -24,7 +45,7 @@ export default function Landing() {
                 <MapPin size={14} /> Hyderabad · Visakhapatnam
               </span>
               <span className="inline-flex items-center gap-2 rounded-full bg-navy px-3 py-1 text-xs font-black uppercase tracking-widest text-white">
-                <Smartphone size={14} /> Coming soon to Google Play
+                <Smartphone size={14} /> Play Store launch: 29 November 2026
               </span>
             </div>
             <h1 className="display mt-5 text-4xl text-navy sm:text-6xl">
@@ -46,6 +67,8 @@ export default function Landing() {
             <p className="mt-6 text-sm font-bold text-slate-500">
               Local knowledge. Real hospitality. Flexible work.
             </p>
+            <p className="mt-3 text-lg font-black text-orange" role="timer">{countdown}</p>
+            {launchVideo && <video className="mt-5 w-full max-w-xl rounded-2xl" src={launchVideo} controls playsInline aria-label="Duedoh launch video" />}
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xl shadow-navy/5">
