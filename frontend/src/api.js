@@ -106,6 +106,7 @@ export const api = {
     return result.items || result.cities || (Array.isArray(result) ? result : []);
   }),
   tierOptions: () => request("/v1/dude/onboarding/tier-options").then(data),
+  resumeApplication: () => request("/v1/dude/onboarding/resume").then(data),
   saveProfile: (body) => request("/v1/dude/onboarding/profile", { method: "POST", body: JSON.stringify(body) }).then(data),
   saveTier: (body) => request("/v1/dude/onboarding/tier", { method: "POST", body: JSON.stringify(body) }).then(data),
   saveVehicle: (body) => request("/v1/dude/onboarding/vehicle", { method: "POST", body: JSON.stringify(body) }).then(data),

@@ -20,7 +20,7 @@ export function Header() {
 }
 
 export function Footer() {
-  return <footer className="mt-16 border-t border-slate-200 bg-white"><div className="mx-auto flex max-w-6xl flex-col justify-between gap-5 px-5 py-8 text-sm text-slate-500 sm:flex-row sm:items-center"><div className="flex items-center gap-2.5"><BrandMark compact /><p>© {new Date().getFullYear()} Duedoh. Local knowledge, real hospitality.</p></div><Link to="/status" className="font-semibold text-navy">Check application status</Link></div></footer>;
+  return <footer className="mt-16 border-t border-slate-200 bg-white"><div className="mx-auto flex max-w-6xl flex-col justify-between gap-5 px-5 py-8 text-sm text-slate-500 sm:flex-row sm:items-center"><div className="flex items-center gap-2.5"><BrandMark compact /><p>© {new Date().getFullYear()} Duedoh. Local knowledge, real hospitality.</p></div><nav className="flex flex-wrap gap-x-4 gap-y-2"><a href="https://duedoh.com/partner-agreement.html" className="font-semibold text-navy">Partner agreement</a><a href="https://duedoh.com/launch-bonus-terms.html" className="font-semibold text-navy">Bonus terms</a><a href="https://duedoh.com/privacy.html" className="font-semibold text-navy">Privacy</a><Link to="/status" className="font-semibold text-navy">Application status</Link></nav></div></footer>;
 }
 
 export default function Layout({ children }) {

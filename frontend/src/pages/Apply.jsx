@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, ArrowRight, CheckCircle2, Clock3, FileUp, Loader2, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Clock3, FileUp, Loader2, MapPin, ShieldCheck } from "lucide-react";
 import Layout from "../components/Layout.jsx";
 import { Field } from "../components/Field.jsx";
 import { api } from "../api.js";
@@ -12,7 +12,7 @@ const vehiclePhotoTypes = ["vehicle_front", "vehicle_side", "vehicle_rear", "veh
 const initialForm = {
   fullName: "", email: "", otp: "", phone: "", dob: "", cityId: "", qualification: "", bio: "", languages: [], experienceYears: "",
   tier: "lite", vehicleType: "bike", brand: "", model: "", vehicleNumber: "", seatCount: "", licenceExpiry: "", rcExpiry: "",
-  weeklyDays: [0, 1, 2, 3, 4],
+  weeklyDays: [0, 1, 2, 3, 4], serviceLatitude: null, serviceLongitude: null,
   idType: "pan", panNumber: "", aadhaarNumber: "", payoutType: "upi", upiId: "", bankAccountNo: "", bankIfsc: "", bankHolderName: "",
 };
 
@@ -25,15 +25,18 @@ function persistedForm() {
   catch { return initialForm; }
 }
 
-function FileField({ label, value, onChange, hint, accept = "image/*,application/pdf" }) {
+function FileField({ label, value, onChange, hint, accept = "image/*,application/pdf", existing }) {
   const ref = useRef(null);
+  const locked = existing && existing.verification_status !== "rejected";
+  const previousReason = existing?.rejection_reason;
   return <div>
     <span className="label">{label}</span>
-    <button type="button" onClick={() => ref.current?.click()} className="flex min-h-20 w-full overflow-hidden gap-3 rounded-xl border border-dashed border-slate-300 bg-white p-3 text-left hover:border-orange">
+    <button type="button" disabled={locked} onClick={() => ref.current?.click()} className={`flex min-h-20 w-full overflow-hidden gap-3 rounded-xl border border-dashed p-3 text-left ${existing?.verification_status === "rejected" ? "border-red-400 bg-red-50" : "border-slate-300 bg-white"} ${locked ? "cursor-default" : "hover:border-orange"}`}>
       <span className="grid size-11 place-items-center rounded-lg bg-orange-soft text-orange"><FileUp size={20} /></span>
-      <span className="min-w-0 flex-1"><span className="block break-words text-sm font-semibold text-navy">{value?.name || "Choose a clear image or PDF"}</span><span className="mt-0.5 block text-xs text-slate-500">{hint || "JPG, PNG, or PDF up to 15 MB"}</span></span>
+      <span className="min-w-0 flex-1"><span className="block break-words text-sm font-semibold text-navy">{value?.name || (existing ? `${existing.label} already uploaded` : "Choose a clear image or PDF")}</span><span className="mt-0.5 block text-xs text-slate-500">{existing?.verification_status === "approved" ? "Approved — no action needed" : locked ? (previousReason ? "Replacement uploaded — awaiting review" : "Uploaded — awaiting review") : hint || "JPG, PNG, or PDF up to 15 MB"}</span></span>
     </button>
     <input ref={ref} className="hidden" type="file" accept={accept} onChange={(event) => onChange(event.target.files?.[0] || null)} />
+    {previousReason && <p className={`mt-2 rounded-lg px-3 py-2 text-xs font-semibold ${existing.verification_status === "rejected" ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-800"}`}>{existing.verification_status === "rejected" ? "Rejected" : "Previous rejection"}: {previousReason}{existing.verification_status === "pending" ? " — your replacement is awaiting review." : " — upload only this item again."}</p>}
   </div>;
 }
 
@@ -50,10 +53,13 @@ export default function Apply() {
   const [cities, setCities] = useState([]);
   const [tierOptions, setTierOptions] = useState([]);
   const [files, setFiles] = useState({});
+  const [existingDocuments, setExistingDocuments] = useState({});
+  const [correctionMode, setCorrectionMode] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingLookups, setLoadingLookups] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
+  const [locating, setLocating] = useState(false);
 
   const needsVehicle = form.tier === "pro";
   const steps = useMemo(() => ["Account", "Personal", "Service", ...(needsVehicle ? ["Vehicle"] : []), "Availability", "Documents", "Payout"], [needsVehicle]);
@@ -72,7 +78,7 @@ export default function Apply() {
   useEffect(() => { window.scrollTo({ top: 0, behavior: "smooth" }); }, [step]);
   useEffect(() => {
     if (!api.hasSession()) return;
-    loadLookups();
+    loadSavedApplication();
   }, []);
 
   async function loadLookups() {
@@ -85,6 +91,64 @@ export default function Apply() {
       setError(requestError.message);
     } finally { setLoadingLookups(false); }
   }
+
+  async function loadSavedApplication({ openCorrections = true } = {}) {
+    setLoadingLookups(true);
+    try {
+      const [savedCities, options, saved] = await Promise.all([api.cities(), api.tierOptions(), api.resumeApplication()]);
+      setCities(savedCities);
+      setTierOptions(options.tiers || []);
+      const profile = saved.profile || {};
+      const vehicle = saved.vehicle || {};
+      const payout = saved.payout || {};
+      setForm((current) => ({
+        ...current,
+        fullName: profile.full_name || current.fullName,
+        email: profile.email || current.email,
+        phone: profile.phone || "",
+        dob: profile.date_of_birth || "",
+        cityId: profile.city_id || "",
+        qualification: profile.qualification || "",
+        bio: profile.bio || "",
+        languages: profile.languages || [],
+        experienceYears: profile.experience_years ?? "",
+        tier: saved.tier || current.tier,
+        vehicleType: vehicle.vehicle_type || current.vehicleType,
+        brand: vehicle.brand || "",
+        model: vehicle.model || "",
+        vehicleNumber: vehicle.vehicle_number || "",
+        seatCount: vehicle.seat_count?.toString() || "",
+        licenceExpiry: vehicle.licence_expiry || "",
+        rcExpiry: vehicle.rc_expiry || "",
+        weeklyDays: saved.weekly_days?.length ? saved.weekly_days : current.weeklyDays,
+        serviceLatitude: saved.service_location?.latitude ?? current.serviceLatitude,
+        serviceLongitude: saved.service_location?.longitude ?? current.serviceLongitude,
+        idType: saved.id_type || current.idType,
+        panNumber: saved.pan_number || "",
+        aadhaarNumber: saved.aadhaar_number || "",
+        payoutType: payout.upi_id ? "upi" : "bank",
+        upiId: payout.upi_id || "",
+        bankAccountNo: payout.bank_account_no || "",
+        bankIfsc: payout.bank_ifsc || "",
+        bankHolderName: payout.bank_holder_name || "",
+      }));
+      const byType = Object.fromEntries((saved.documents || []).map((item) => [item.document_type, item]));
+      setExistingDocuments(byType);
+      const hasCorrections = Object.values(byType).some((item) => item.verification_status === "rejected");
+      if (openCorrections && hasCorrections) {
+        setCorrectionMode(true);
+        const savedNeedsVehicle = (saved.tier || form.tier) === "pro";
+        const savedSteps = ["Account", "Personal", "Service", ...(savedNeedsVehicle ? ["Vehicle"] : []), "Availability", "Documents", "Payout"];
+        setStep(savedSteps.indexOf("Documents"));
+      }
+      return hasCorrections;
+    } catch (requestError) {
+      setError(requestError.message);
+      return false;
+    } finally { setLoadingLookups(false); }
+  }
+
+  const documentSatisfied = (type) => Boolean(files[type] || (existingDocuments[type] && existingDocuments[type].verification_status !== "rejected"));
 
   function check() {
     if (currentLabel === "Account") {
@@ -108,7 +172,7 @@ export default function Apply() {
       if (!form.seatCount || !Number.isInteger(seatCount) || seatCount < seatLimits[0] || seatCount > seatLimits[1]) errors.seat_count = `Enter ${seatLimits[0]}${seatLimits[0] === seatLimits[1] ? "" : `–${seatLimits[1]}`} seats including the driver.`;
       if (!form.licenceExpiry) errors.licence_expiry = "Select the driving licence expiry date.";
       if (!form.rcExpiry) errors.rc_expiry = "Select the RC expiry date.";
-      if (vehiclePhotoTypes.filter((type) => files[type]).length < 2) errors.vehicle_photos = "Add at least two clear vehicle photos.";
+      if (vehiclePhotoTypes.filter(documentSatisfied).length < 2) errors.vehicle_photos = "Add at least two clear vehicle photos.";
       setFieldErrors(errors);
       if (Object.keys(errors).length) return "Please correct the highlighted vehicle fields.";
     }
@@ -116,16 +180,35 @@ export default function Apply() {
       if (!form.weeklyDays.length) return "Choose at least one available day.";
     }
     if (currentLabel === "Documents") {
-      const identityFiles = form.idType === "pan" ? [files.pan_front, files.pan_back] : [files.aadhaar_front, files.aadhaar_back];
+      const identityTypes = form.idType === "pan" ? ["pan_front", "pan_back"] : ["aadhaar_front", "aadhaar_back"];
       const identityNumber = form.idType === "pan" ? form.panNumber.match(/^[A-Za-z]{5}\d{4}[A-Za-z]$/) : form.aadhaarNumber.match(/^\d{12}$/);
-      const proFiles = needsVehicle ? [files.licence_front, files.licence_back, files.rc] : [];
-      if (!identityNumber || !files.selfie || identityFiles.some((file) => !file) || proFiles.some((file) => !file)) return "Add your ID number and all required verification files.";
+      const proTypes = needsVehicle ? ["licence_front", "licence_back", "rc"] : [];
+      if (!identityNumber || !documentSatisfied("selfie") || identityTypes.some((type) => !documentSatisfied(type)) || proTypes.some((type) => !documentSatisfied(type))) return "Add your ID number and only the missing or rejected verification files.";
     }
     if (currentLabel === "Payout") {
       const bankComplete = [form.bankAccountNo, form.bankIfsc, form.bankHolderName].every((value) => value.trim());
       if (!(form.payoutType === "upi" ? form.upiId.trim() : bankComplete)) return "Enter your UPI ID or complete bank details.";
     }
     return "";
+  }
+
+  function captureServiceLocation() {
+    if (!navigator.geolocation) {
+      setError("Location is not supported by this browser. Please use a modern browser or complete registration in the Dude app.");
+      return;
+    }
+    setLocating(true); setError("");
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setForm((current) => ({ ...current, serviceLatitude: coords.latitude, serviceLongitude: coords.longitude }));
+        setLocating(false);
+      },
+      (locationError) => {
+        setError(locationError.code === 1 ? "Allow location access in your browser to set your service location." : "We could not get your location. Move to an open area and try again.");
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 },
+    );
   }
 
   async function requestOtp() {
@@ -147,7 +230,8 @@ export default function Apply() {
           await api.verifyOtp({ email: form.email, otp: form.otp, fullName: form.fullName });
           setAuthenticated(true);
         }
-        await loadLookups();
+        const hasCorrections = await loadSavedApplication();
+        if (hasCorrections) return;
       } else if (currentLabel === "Personal") {
         await api.saveProfile({ full_name: form.fullName.trim(), email: form.email.trim(), phone: form.phone, date_of_birth: form.dob, city_id: form.cityId, qualification: form.qualification.trim(), bio: form.bio.trim(), languages: form.languages });
       } else if (currentLabel === "Service") {
@@ -158,7 +242,7 @@ export default function Apply() {
         vehiclePhotoTypes.forEach((type) => { if (files[type]) vehiclePhotos.append(type, files[type]); });
         await api.uploadDocuments(vehiclePhotos);
       } else if (currentLabel === "Availability") {
-        await api.saveAvailability({ weekly: form.weeklyDays.map((day) => ({ day_of_week: day })) });
+        await api.saveAvailability({ weekly: form.weeklyDays.map((day) => ({ day_of_week: day })), service_latitude: form.serviceLatitude, service_longitude: form.serviceLongitude });
       } else if (currentLabel === "Documents") {
         const body = new FormData();
         body.append(form.idType === "pan" ? "pan_number" : "aadhaar_number", form.idType === "pan" ? form.panNumber.toUpperCase() : form.aadhaarNumber);
@@ -169,6 +253,12 @@ export default function Apply() {
         documentTypes.forEach((type) => { if (files[type]) body.append(type, files[type]); });
         const result = await api.uploadDocuments(body);
         if (result.missing?.length) throw new Error(`Please add: ${result.missing.map((item) => item.replaceAll("_", " ")).join(", ")}.`);
+        await loadSavedApplication({ openCorrections: false });
+        setFiles({});
+        if (correctionMode) {
+          navigate("/status", { replace: true });
+          return;
+        }
       } else if (currentLabel === "Payout") {
         await api.saveBank(form.payoutType === "upi" ? { upi_id: form.upiId.trim() } : { bank_account_no: form.bankAccountNo.trim(), bank_ifsc: form.bankIfsc.trim(), bank_holder_name: form.bankHolderName.trim() });
         localStorage.removeItem(STORAGE_KEY);
@@ -197,7 +287,7 @@ export default function Apply() {
       <div className="mb-8 grid grid-cols-4 gap-1 sm:grid-cols-7">{steps.map((item, index) => <div key={item}><div className={`h-1.5 rounded-full ${index <= step ? "bg-orange" : "bg-slate-200"}`} /><span className={`mt-2 hidden text-[11px] font-semibold sm:block ${index === step ? "text-navy" : "text-slate-400"}`}>{item}</span></div>)}</div>
 
       <section className="border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
-        {currentLabel === "Account" && <div className="space-y-5"><div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-600"><ShieldCheck className="mr-2 inline text-orange" size={18} />Use the email you will use to sign in to the Dude app after launch.</div><Field label="Full name"><input className="field" value={form.fullName} onChange={(e) => set("fullName", e.target.value)} placeholder="Your full name" /></Field><Field label="Email address"><input className="field" type="email" value={form.email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" /></Field>{authenticated && api.hasSession(form.email) ? <p className="rounded-xl border border-green-200 bg-green-50 p-3 text-sm font-semibold text-green-800">Email verified. Your secure session will continue automatically.</p> : <>{otpRequested && <Field label="Verification code" hint="We sent a 6-digit code to your email."><input className="field tracking-[.25em]" inputMode="numeric" maxLength="6" value={form.otp} onChange={(e) => set("otp", e.target.value.replace(/\D/g, ""))} placeholder="000000" /></Field>}<button type="button" className="btn-secondary w-full" onClick={requestOtp} disabled={loading}>{loading && !otpRequested ? <Loader2 className="animate-spin" size={18} /> : otpRequested ? "Send a new code" : "Send verification code"}</button></>}</div>}
+        {currentLabel === "Account" && <div className="space-y-5"><div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-600"><ShieldCheck className="mr-2 inline text-orange" size={18} />Use the email you will use to sign in to the Dude app after launch.</div><Field label="Full name"><input className="field" value={form.fullName} onChange={(e) => set("fullName", e.target.value)} placeholder="Your full name" /></Field><Field label="Email address"><input className="field" type="email" value={form.email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" /></Field>{authenticated && api.hasSession(form.email) ? <p className="rounded-xl border border-green-200 bg-green-50 p-3 text-sm font-semibold text-green-800">Email verified. Your secure session will continue automatically.</p> : <>{otpRequested && <Field label="Verification code" hint="We sent a 6-digit code to your email."><input className="field tracking-[.25em]" inputMode="numeric" maxLength="6" value={form.otp} onChange={(e) => set("otp", e.target.value.replace(/\D/g, ""))} placeholder="000000" /></Field>}<button type="button" className="btn-secondary w-full" onClick={requestOtp} disabled={loading}>{loading && !otpRequested ? <Loader2 className="animate-spin" size={18} /> : otpRequested ? "Send a new code" : "Send verification code"}</button></>}<p className="text-xs leading-5 text-slate-500">By continuing, you confirm you are 18+ and accept the <a className="font-bold text-orange" href="https://duedoh.com/partner-agreement.html" target="_blank" rel="noreferrer">Dude Partner Agreement</a> and <a className="font-bold text-orange" href="https://duedoh.com/privacy.html" target="_blank" rel="noreferrer">Privacy Policy</a>. Dates and times use India Standard Time.</p></div>}
 
         {currentLabel === "Personal" && <div className="grid gap-5 sm:grid-cols-2"><Field label="Mobile number" hint="10 digits, without +91"><input className="field" inputMode="tel" maxLength="10" value={form.phone} onChange={(e) => set("phone", e.target.value.replace(/\D/g, ""))} placeholder="9876543210" /></Field><Field label="Date of birth"><input className="field" type="date" value={form.dob} onChange={(e) => set("dob", e.target.value)} /></Field><Field label="Home city"><select className="field" value={form.cityId} disabled={loadingLookups} onChange={(e) => set("cityId", e.target.value)}><option value="">Select a Duedoh city</option>{cities.map((city) => <option key={city.id} value={city.id}>{city.name}{city.state ? `, ${city.state}` : ""}</option>)}</select></Field><Field label="Qualification"><input className="field" value={form.qualification} onChange={(e) => set("qualification", e.target.value)} placeholder="e.g. Graduate" /></Field><div className="sm:col-span-2"><Field label="Languages you speak"><div className="flex flex-wrap gap-2">{languages.map((language) => <Toggle key={language} active={form.languages.includes(language)} onClick={() => set("languages", form.languages.includes(language) ? form.languages.filter((item) => item !== language) : [...form.languages, language])}>{language}</Toggle>)}</div></Field></div><div className="sm:col-span-2"><Field label="What can you show in your city?"><textarea className="field min-h-28" maxLength="300" value={form.bio} onChange={(e) => set("bio", e.target.value)} placeholder="Share the places, experiences, and local highlights you can show travellers." /></Field></div></div>}
 
@@ -214,12 +304,15 @@ export default function Apply() {
           <div className="sm:col-span-2 border-t border-slate-200 pt-6">
             <p className="text-sm font-bold text-navy">Vehicle photos <span className="font-normal text-slate-400">(minimum 2)</span></p>
             <p className="mt-1 text-sm text-slate-500">Choose any two or more clear angles. Front, side, rear, and interior are all accepted.</p>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">{[["vehicle_front", "Front view"], ["vehicle_side", "Side view"], ["vehicle_rear", "Rear view"], ["vehicle_interior", "Interior view"]].map(([type, label]) => <FileField key={type} label={label} value={files[type]} accept="image/*" hint="A clear photo of your vehicle" onChange={(file) => setFiles((current) => ({ ...current, [type]: file }))} />)}</div>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">{[["vehicle_front", "Front view"], ["vehicle_side", "Side view"], ["vehicle_rear", "Rear view"], ["vehicle_interior", "Interior view"]].map(([type, label]) => <FileField key={type} label={label} value={files[type]} existing={existingDocuments[type]} accept="image/*" hint="A clear photo of your vehicle" onChange={(file) => setFiles((current) => ({ ...current, [type]: file }))} />)}</div>
             {fieldErrors.vehicle_photos && <p className="mt-2 text-xs font-semibold text-red-600">{fieldErrors.vehicle_photos}</p>}
           </div>
         </div>}
 
         {currentLabel === "Availability" && <div className="space-y-6">
+          <div className={`rounded-xl border p-4 ${form.serviceLatitude == null ? "border-orange/40 bg-orange-soft" : "border-green-200 bg-green-50"}`}>
+            <div className="flex items-start gap-3"><MapPin className={form.serviceLatitude == null ? "text-orange" : "text-green-700"} size={22} /><div className="min-w-0 flex-1"><p className="font-bold text-navy">{form.serviceLatitude == null ? "Add service location (optional)" : "Service location saved"}</p><p className="mt-1 text-sm text-slate-600">Add it to appear higher in nearby searches. You can skip this and add or change it later in the Dude app Profile. Travellers never see your exact saved location.</p><button type="button" onClick={captureServiceLocation} disabled={locating} className="btn-secondary mt-4">{locating ? <Loader2 className="animate-spin" size={18} /> : <MapPin size={18} />}{form.serviceLatitude == null ? "Use my current location" : "Update current location"}</button></div></div>
+          </div>
           <fieldset>
             <legend className="label">Days you are usually available</legend>
             <div className="flex flex-wrap gap-2">{days.map((day, index) => <Toggle key={day} active={form.weeklyDays.includes(index)} onClick={() => set("weeklyDays", form.weeklyDays.includes(index) ? form.weeklyDays.filter((item) => item !== index) : [...form.weeklyDays, index].sort())}>{day.slice(0, 3)}</Toggle>)}</div>
@@ -230,12 +323,12 @@ export default function Apply() {
           </div>
         </div>}
 
-        {currentLabel === "Documents" && <div className="space-y-6"><div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-600"><Clock3 className="mr-2 inline text-orange" size={18} />These documents are reviewed by the Duedoh team before your account is approved.</div><Field label="Choose identity document"><div className="flex gap-2"><Toggle active={form.idType === "pan"} onClick={() => set("idType", "pan")}>PAN card</Toggle><Toggle active={form.idType === "aadhaar"} onClick={() => set("idType", "aadhaar")}>Aadhaar card</Toggle></div></Field><Field label={form.idType === "pan" ? "PAN number" : "Aadhaar number"}><input className="field" maxLength={form.idType === "pan" ? 10 : 12} value={form.idType === "pan" ? form.panNumber : form.aadhaarNumber} onChange={(e) => set(form.idType === "pan" ? "panNumber" : "aadhaarNumber", form.idType === "pan" ? e.target.value.toUpperCase() : e.target.value.replace(/\D/g, ""))} placeholder={form.idType === "pan" ? "AAAAA9999A" : "12-digit Aadhaar number"} /></Field><div className="grid gap-4 sm:grid-cols-2"><FileField label={`${form.idType === "pan" ? "PAN" : "Aadhaar"} front`} value={files[`${form.idType}_front`]} onChange={(file) => setFiles((current) => ({ ...current, [`${form.idType}_front`]: file }))} /><FileField label={`${form.idType === "pan" ? "PAN" : "Aadhaar"} back`} value={files[`${form.idType}_back`]} onChange={(file) => setFiles((current) => ({ ...current, [`${form.idType}_back`]: file }))} /><FileField label="Your selfie" value={files.selfie} onChange={(file) => setFiles((current) => ({ ...current, selfie: file }))} hint="A clear, recent face photo" /></div>{needsVehicle && <><p className="border-t border-slate-200 pt-6 text-sm font-bold text-navy">Vehicle documents</p><div className="grid gap-4 sm:grid-cols-2"><FileField label="Driving licence front" value={files.licence_front} onChange={(file) => setFiles((current) => ({ ...current, licence_front: file }))} /><FileField label="Driving licence back" value={files.licence_back} onChange={(file) => setFiles((current) => ({ ...current, licence_back: file }))} /><FileField label="RC document" value={files.rc} onChange={(file) => setFiles((current) => ({ ...current, rc: file }))} /></div></>}</div>}
+        {currentLabel === "Documents" && <div className="space-y-6"><div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-600"><Clock3 className="mr-2 inline text-orange" size={18} />Your saved documents remain here. Upload only an item marked rejected or missing.</div><Field label="Choose identity document"><div className="flex gap-2"><Toggle active={form.idType === "pan"} onClick={() => set("idType", "pan")}>PAN card</Toggle><Toggle active={form.idType === "aadhaar"} onClick={() => set("idType", "aadhaar")}>Aadhaar card</Toggle></div></Field><Field label={form.idType === "pan" ? "PAN number" : "Aadhaar number"}><input className="field" maxLength={form.idType === "pan" ? 10 : 12} value={form.idType === "pan" ? form.panNumber : form.aadhaarNumber} onChange={(e) => set(form.idType === "pan" ? "panNumber" : "aadhaarNumber", form.idType === "pan" ? e.target.value.toUpperCase() : e.target.value.replace(/\D/g, ""))} placeholder={form.idType === "pan" ? "AAAAA9999A" : "12-digit Aadhaar number"} /></Field><div className="grid gap-4 sm:grid-cols-2"><FileField label={`${form.idType === "pan" ? "PAN" : "Aadhaar"} front`} value={files[`${form.idType}_front`]} existing={existingDocuments[`${form.idType}_front`]} onChange={(file) => setFiles((current) => ({ ...current, [`${form.idType}_front`]: file }))} /><FileField label={`${form.idType === "pan" ? "PAN" : "Aadhaar"} back`} value={files[`${form.idType}_back`]} existing={existingDocuments[`${form.idType}_back`]} onChange={(file) => setFiles((current) => ({ ...current, [`${form.idType}_back`]: file }))} /><FileField label="Your selfie" value={files.selfie} existing={existingDocuments.selfie} onChange={(file) => setFiles((current) => ({ ...current, selfie: file }))} hint="A clear, recent face photo" /></div>{needsVehicle && <><p className="border-t border-slate-200 pt-6 text-sm font-bold text-navy">Vehicle documents</p><div className="grid gap-4 sm:grid-cols-2"><FileField label="Driving licence front" value={files.licence_front} existing={existingDocuments.licence_front} onChange={(file) => setFiles((current) => ({ ...current, licence_front: file }))} /><FileField label="Driving licence back" value={files.licence_back} existing={existingDocuments.licence_back} onChange={(file) => setFiles((current) => ({ ...current, licence_back: file }))} /><FileField label="RC document" value={files.rc} existing={existingDocuments.rc} onChange={(file) => setFiles((current) => ({ ...current, rc: file }))} /></div></>}</div>}
 
         {currentLabel === "Payout" && <div className="space-y-6"><div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-600">Choose one payout method. Your details are stored securely with your Dude application.</div><div className="flex gap-2"><Toggle active={form.payoutType === "upi"} onClick={() => set("payoutType", "upi")}>UPI</Toggle><Toggle active={form.payoutType === "bank"} onClick={() => set("payoutType", "bank")}>Bank account</Toggle></div>{form.payoutType === "upi" ? <Field label="UPI ID"><input className="field" value={form.upiId} onChange={(e) => set("upiId", e.target.value)} placeholder="name@bank" /></Field> : <div className="grid gap-5 sm:grid-cols-2"><Field label="Account holder name"><input className="field" value={form.bankHolderName} onChange={(e) => set("bankHolderName", e.target.value)} /></Field><Field label="Account number"><input className="field" inputMode="numeric" value={form.bankAccountNo} onChange={(e) => set("bankAccountNo", e.target.value)} /></Field><Field label="IFSC code"><input className="field" value={form.bankIfsc} onChange={(e) => set("bankIfsc", e.target.value.toUpperCase())} placeholder="SBIN0000000" /></Field></div>}</div>}
 
         {error && <p className="mt-6 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-800">{error}</p>}
-        <div className="mt-8 flex items-center justify-between gap-3 border-t border-slate-200 pt-5"><button type="button" onClick={() => { setError(""); setStep((value) => Math.max(0, value - 1)); }} disabled={step === 0 || loading} className="btn-secondary"><ArrowLeft size={18} /> Back</button><button type="button" onClick={next} disabled={loading || (currentLabel === "Service" && !selectedTier)} className="btn-primary">{loading ? <Loader2 className="animate-spin" size={18} /> : currentLabel === "Payout" ? <><CheckCircle2 size={18} /> Submit application</> : <>Save & continue <ArrowRight size={18} /></>}</button></div>
+        <div className="mt-8 flex items-center justify-between gap-3 border-t border-slate-200 pt-5"><button type="button" onClick={() => { setError(""); setStep((value) => Math.max(0, value - 1)); }} disabled={step === 0 || loading || correctionMode} className="btn-secondary"><ArrowLeft size={18} /> Back</button><button type="button" onClick={next} disabled={loading || (currentLabel === "Service" && !selectedTier)} className="btn-primary">{loading ? <Loader2 className="animate-spin" size={18} /> : correctionMode && currentLabel === "Documents" ? <><CheckCircle2 size={18} /> Submit corrections</> : currentLabel === "Payout" ? <><CheckCircle2 size={18} /> Submit application</> : <>Save & continue <ArrowRight size={18} /></>}</button></div>
       </section>
       <p className="mt-6 text-center text-sm text-slate-500">Already registered? <Link to="/status" className="font-bold text-orange">Check your application</Link></p>
     </main>
